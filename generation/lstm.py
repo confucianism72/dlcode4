@@ -222,7 +222,7 @@ class Seq2SeqModel(BaseModel):
         #                              END OF YOUR CODE                              #
         ##############################################################################
         # print('logits',logits.shape,logits.device)
-        return logits.permute(1,0,2)
+        return logits.permute(1,0,2)[1:]
 
     def get_loss(self, source, prev_outputs, target, lengths, eval, reduce=True,  **unused):
         # print('get_loss',source.shape, prev_outputs.shape, target.shape, lengths.shape)
@@ -232,7 +232,7 @@ class Seq2SeqModel(BaseModel):
         # print(logits.device, lprobs.device, target.device)#, self.padding_idx.device)
         return F.nll_loss(
             lprobs,
-            target.view(-1),
+            target[:, :-1].contiguous().view(-1),
             ignore_index=self.padding_idx,
             reduction="sum" if reduce else "none",
         )
