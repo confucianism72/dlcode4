@@ -65,7 +65,7 @@ def train(args):
                               batch_size=args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
-                              num_workers= 0 if torch.backends.mps.is_available() else 2,
+                            #   num_workers= 0 if torch.backends.mps.is_available() else 2,
                               )
     #number of workers should be 2 if using mps
 
