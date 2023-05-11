@@ -155,7 +155,7 @@ class Seq2SeqModel(nn.Module):
         # hidden = self.endecoder(source, prev_outputs)
         # logits = self.out_proj(hidden)
         src = source#.permute(1, 0)
-        trg = prev_outputs#.permute(1, 0)
+        trg = prev_outputs[:, :-1]#.permute(1, 0)
         #src = [batch size, src len]
         #trg = [batch size, trg len]
                 
@@ -177,7 +177,7 @@ class Seq2SeqModel(nn.Module):
     
 
     def get_loss(self, source, prev_outputs, target, reduce=True, **unused):
-        logits = self.logits(source, prev_outputs[:, :-1])
+        logits = self.logits(source, prev_outputs)
         lprobs = F.log_softmax(logits.contiguous(), dim=-1).view(-1, logits.size(-1))
         return F.nll_loss(
             lprobs,

@@ -23,12 +23,12 @@ def evaluate(model, dataset):
         # samples['id']
         bsz = len(samples['lengths'])
         logits = model.logits(**samples)
-        lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1))
+        lprobs = F.log_softmax(logits.contiguous(), dim=-1).view(-1, logits.size(-1))
         # print(next(model.parameters()).device)
         # print(lprobs.device)
         # print(logits.device)
         entropy = F.nll_loss(lprobs.to(device),
-                             samples["target"].view(-1),
+                             samples["target"][:, :-1].contiguous().view(-1),
                              ignore_index=dataset.padding_idx,# dataset.dictionary.eos()],# dataset.padding_idx,
                              reduction="none").view(bsz, -1)
         ppl = np.exp((entropy.sum(dim=-1, keepdim=True) /
