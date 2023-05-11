@@ -222,11 +222,11 @@ class Seq2SeqModel(BaseModel):
         #                              END OF YOUR CODE                              #
         ##############################################################################
         # print('logits',logits.shape,logits.device)
-        return logits
+        return logits.permute(1,0,2)
 
     def get_loss(self, source, prev_outputs, target, lengths, eval, reduce=True,  **unused):
         print('get_loss',source.shape, prev_outputs.shape, target.shape, lengths.shape)
-        logits = self.logits( source, prev_outputs, lengths,eval = eval , **unused).permute(1,0,2) # ource, prev_outputs,lengths,
+        logits = self.logits( source, prev_outputs, lengths,eval = eval , **unused) # ource, prev_outputs,lengths,
         lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)) 
         # print(logits.shape, lprobs.shape, target.shape)
         # print(logits.device, lprobs.device, target.device)#, self.padding_idx.device)
