@@ -29,7 +29,7 @@ def evaluate(model, dataset):
         # print(logits.device)
         entropy = F.nll_loss(lprobs.to(device),
                              samples["target"].view(-1),
-                             ignore_index=dataset.padding_idx,
+                             ignore_index=dataset.padding_idx,# dataset.dictionary.eos()],# dataset.padding_idx,
                              reduction="none").view(bsz, -1)
         ppl = np.exp((entropy.sum(dim=-1, keepdim=True) /
                       (samples["target"] != dataset.padding_idx).sum(

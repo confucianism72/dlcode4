@@ -132,20 +132,58 @@ class Seq2SeqModel(nn.Module):
         # self.src_pad_idx = src_pad_idx
         # self.trg_pad_idx = trg_pad_idx
         self.device = args.device
+       
+    def make_src_mask(self, src):
+        #src = [batch size, src len] 
+        src_mask = (src != self.padding_idx).unsqueeze(1).unsqueeze(2)
+        #src_mask = [batch size, 1, 1, src len]
+        return src_mask
+    
+    def make_trg_mask(self, trg):
+        #trg = [batch size, trg len]
+        trg_pad_mask = (trg != self.padding_idx).unsqueeze(1).unsqueeze(2)
+        #trg_pad_mask = [batch size, 1, 1, trg len]
+        trg_len = trg.shape[1]
+        trg_sub_mask = torch.tril(torch.ones((trg_len, trg_len), device = self.device)).bool()
+        #trg_sub_mask = [trg len, trg len]
+        trg_mask = trg_pad_mask & trg_sub_mask
+        #trg_mask = [batch size, 1, trg len, trg len]
+        return trg_mask
+
 
     def logits(self, source, prev_outputs, **unused):
-        hidden = self.endecoder(source, prev_outputs)
-        logits = self.out_proj(hidden)
-        return logits                                   
+        # hidden = self.endecoder(source, prev_outputs)
+        # logits = self.out_proj(hidden)
+        src = source#.permute(1, 0)
+        trg = prev_outputs#.permute(1, 0)
+        #src = [batch size, src len]
+        #trg = [batch size, trg len]
+                
+        src_mask = self.make_src_mask(src)
+        trg_mask = self.make_trg_mask(trg)
+        
+        #src_mask = [batch size, 1, 1, src len]
+        #trg_mask = [batch size, 1, trg len, trg len]
+        
+        enc_src = self.encoder(src, src_mask)
+        
+        #enc_src = [batch size, src len, hid dim]
+                
+        output, attention = self.decoder(trg, enc_src, trg_mask, src_mask)
+        
+        #output = [batch size, trg len, output dim]
+        #attention = [batch size, n heads, trg len, src len]
+        return  output                         
     
 
     def get_loss(self, source, prev_outputs, target, reduce=True, **unused):
         logits = self.logits(source, prev_outputs)
-        lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1))
+        lprobs = F.log_softmax(logits.contiguous(), dim=-1).view(-1, logits.size(-1))
         return F.nll_loss(
             lprobs,
-            target.view(-1),
-            ignore_index=self.padding_idx,
+            prev_outputs.view(-1),
+            #target.view(-1),
+            ignore_index=self.padding_idx,# self.dictionary.eos()],
             reduction="sum" if reduce else "none",
         )
 
@@ -632,60 +670,60 @@ class TransformerEncoderDecoder(nn.Module):
         return decoder_outputs
 
 
-class EncoderLayer(nn.Module):
+# class EncoderLayer(nn.Module):
 
-    def __init__(self, config):
-        super().__init__()
-        self.embed_dim = config.n_embed
-        self.self_attn = Attention(self.embed_dim,
-                                   config.n_head,
-                                   dropout=config.attention_dropout)
-        self.normalize_before = config.normalize_before
-        self.self_attn_layer_norm = LayerNorm(self.embed_dim)
-        self.dropout = config.dropout
-        self.activation_fn = ACT2FN[config.activation_function]
-        self.activation_dropout = config.activation_dropout
-        self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim)
-        self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim)
-        self.final_layer_norm = LayerNorm(self.embed_dim)
+#     def __init__(self, config):
+#         super().__init__()
+#         self.embed_dim = config.n_embed
+#         self.self_attn = Attention(self.embed_dim,
+#                                    config.n_head,
+#                                    dropout=config.attention_dropout)
+#         self.normalize_before = config.normalize_before
+#         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
+#         self.dropout = config.dropout
+#         self.activation_fn = ACT2FN[config.activation_function]
+#         self.activation_dropout = config.activation_dropout
+#         self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim)
+#         self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim)
+#         self.final_layer_norm = LayerNorm(self.embed_dim)
 
-    def forward(self, x, encoder_padding_mask):
-        """
-        Args:
-            x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
-            encoder_padding_mask (ByteTensor): binary ByteTensor of shape
-                `(batch, src_len)` where padding elements are indicated by ``1``.
-            for t_tgt, t_src is excluded (or masked out), =0 means it is
-            included in attention
+#     def forward(self, x, encoder_padding_mask):
+#         """
+#         Args:
+#             x (Tensor): input to the layer of shape `(seq_len, batch, embed_dim)`
+#             encoder_padding_mask (ByteTensor): binary ByteTensor of shape
+#                 `(batch, src_len)` where padding elements are indicated by ``1``.
+#             for t_tgt, t_src is excluded (or masked out), =0 means it is
+#             included in attention
 
-        Returns:
-            encoded output of shape `(seq_len, batch, embed_dim)`
-        """
-        residual = x
-        if self.normalize_before:
-            x = self.self_attn_layer_norm(x)
-        x = self.self_attn(query=x,
-                           key=x,
-                           key_padding_mask=encoder_padding_mask)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.self_attn_layer_norm(x)
+#         Returns:
+#             encoded output of shape `(seq_len, batch, embed_dim)`
+#         """
+#         residual = x
+#         if self.normalize_before:
+#             x = self.self_attn_layer_norm(x)
+#         x = self.self_attn(query=x,
+#                            key=x,
+#                            key_padding_mask=encoder_padding_mask)
+#         x = F.dropout(x, p=self.dropout, training=self.training)
+#         x = residual + x
+#         if not self.normalize_before:
+#             x = self.self_attn_layer_norm(x)
 
-        residual = x
-        if self.normalize_before:
-            x = self.final_layer_norm(x)
-        x = self.activation_fn(self.fc1(x))
-        x = F.dropout(x, p=self.activation_dropout, training=self.training)
-        x = self.fc2(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.final_layer_norm(x)
-        if torch.isinf(x).any() or torch.isnan(x).any():
-            clamp_value = torch.finfo(x.dtype).max - 1000
-            x = torch.clamp(x, min=-clamp_value, max=clamp_value)
-        return x
+#         residual = x
+#         if self.normalize_before:
+#             x = self.final_layer_norm(x)
+#         x = self.activation_fn(self.fc1(x))
+#         x = F.dropout(x, p=self.activation_dropout, training=self.training)
+#         x = self.fc2(x)
+#         x = F.dropout(x, p=self.dropout, training=self.training)
+#         x = residual + x
+#         if not self.normalize_before:
+#             x = self.final_layer_norm(x)
+#         if torch.isinf(x).any() or torch.isnan(x).any():
+#             clamp_value = torch.finfo(x.dtype).max - 1000
+#             x = torch.clamp(x, min=-clamp_value, max=clamp_value)
+#         return x
 
 
 class TransformerEncoder(nn.Module):
@@ -765,86 +803,86 @@ class TransformerEncoder(nn.Module):
         return x
 
 
-class DecoderLayer(nn.Module):
+# class DecoderLayer(nn.Module):
 
-    def __init__(self, config):
-        super().__init__()
-        self.embed_dim = config.n_embed
+#     def __init__(self, config):
+#         super().__init__()
+#         self.embed_dim = config.n_embed
 
-        self.self_attn = Attention(
-            embed_dim=self.embed_dim,
-            num_heads=config.n_head,
-            dropout=config.attention_dropout,
-        )
-        self.dropout = config.dropout
-        self.activation_fn = ACT2FN[config.activation_function]
-        self.activation_dropout = config.activation_dropout
-        self.normalize_before = config.normalize_before
+#         self.self_attn = Attention(
+#             embed_dim=self.embed_dim,
+#             num_heads=config.n_head,
+#             dropout=config.attention_dropout,
+#         )
+#         self.dropout = config.dropout
+#         self.activation_fn = ACT2FN[config.activation_function]
+#         self.activation_dropout = config.activation_dropout
+#         self.normalize_before = config.normalize_before
 
-        self.self_attn_layer_norm = LayerNorm(self.embed_dim)
-        self.encoder_attn = Attention(
-            self.embed_dim,
-            config.n_head,
-            dropout=config.attention_dropout,
-            encoder_decoder_attention=True,
-        )
-        self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
-        self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim)
-        self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim)
-        self.final_layer_norm = LayerNorm(self.embed_dim)
+#         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
+#         self.encoder_attn = Attention(
+#             self.embed_dim,
+#             config.n_head,
+#             dropout=config.attention_dropout,
+#             encoder_decoder_attention=True,
+#         )
+#         self.encoder_attn_layer_norm = LayerNorm(self.embed_dim)
+#         self.fc1 = nn.Linear(self.embed_dim, config.ffn_dim)
+#         self.fc2 = nn.Linear(config.ffn_dim, self.embed_dim)
+#         self.final_layer_norm = LayerNorm(self.embed_dim)
 
-    def forward(
-        self,
-        x,
-        encoder_hidden_states,
-        encoder_attn_mask=None,
-        causal_mask=None,
-        decoder_padding_mask=None,
-    ):
-        residual = x
+#     def forward(
+#         self,
+#         x,
+#         encoder_hidden_states,
+#         encoder_attn_mask=None,
+#         causal_mask=None,
+#         decoder_padding_mask=None,
+#     ):
+#         residual = x
 
-        if self.normalize_before:
-            x = self.self_attn_layer_norm(x)
-        # Self Attention
+#         if self.normalize_before:
+#             x = self.self_attn_layer_norm(x)
+#         # Self Attention
 
-        x = self.self_attn(
-            query=x,
-            key=x,
-            key_padding_mask=decoder_padding_mask,
-            attn_mask=causal_mask,
-        )
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.self_attn_layer_norm(x)
+#         x = self.self_attn(
+#             query=x,
+#             key=x,
+#             key_padding_mask=decoder_padding_mask,
+#             attn_mask=causal_mask,
+#         )
+#         x = F.dropout(x, p=self.dropout, training=self.training)
+#         x = residual + x
+#         if not self.normalize_before:
+#             x = self.self_attn_layer_norm(x)
 
-        # Cross attention
-        residual = x
-        assert self.encoder_attn.cache_key != self.self_attn.cache_key
-        if self.normalize_before:
-            x = self.encoder_attn_layer_norm(x)
-        x = self.encoder_attn(
-            query=x,
-            key=encoder_hidden_states,
-            key_padding_mask=encoder_attn_mask,
-        )
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.encoder_attn_layer_norm(x)
+#         # Cross attention
+#         residual = x
+#         assert self.encoder_attn.cache_key != self.self_attn.cache_key
+#         if self.normalize_before:
+#             x = self.encoder_attn_layer_norm(x)
+#         x = self.encoder_attn(
+#             query=x,
+#             key=encoder_hidden_states,
+#             key_padding_mask=encoder_attn_mask,
+#         )
+#         x = F.dropout(x, p=self.dropout, training=self.training)
+#         x = residual + x
+#         if not self.normalize_before:
+#             x = self.encoder_attn_layer_norm(x)
 
-        # Fully Connected
-        residual = x
-        if self.normalize_before:
-            x = self.final_layer_norm(x)
-        x = self.activation_fn(self.fc1(x))
-        x = F.dropout(x, p=self.activation_dropout, training=self.training)
-        x = self.fc2(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.final_layer_norm(x)
-        return x
+#         # Fully Connected
+#         residual = x
+#         if self.normalize_before:
+#             x = self.final_layer_norm(x)
+#         x = self.activation_fn(self.fc1(x))
+#         x = F.dropout(x, p=self.activation_dropout, training=self.training)
+#         x = self.fc2(x)
+#         x = F.dropout(x, p=self.dropout, training=self.training)
+#         x = residual + x
+#         if not self.normalize_before:
+#             x = self.final_layer_norm(x)
+#         return x
 
 
 class TransformerDecoder(nn.Module):
