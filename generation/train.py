@@ -66,7 +66,7 @@ def train(args):
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
                               num_workers= 0 if torch.backends.mps.is_available() else 2,
-                              device = device)
+                              )
     #number of workers should be 2 if using mps
 
     evaluate(model, valid_set)
