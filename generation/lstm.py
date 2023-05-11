@@ -109,7 +109,7 @@ class Seq2SeqModel(BaseModel):
         OUTPUT_DIM = len(dictionary)
         ENC_DROPOUT = args.dropout_input
         DEC_DROPOUT = args.dropout_output
-        encoder = Encoder(INPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, ENC_DROPOUT).to(self.device)
+        encoder = Encoder(INPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, ENC_DROPOUT,num_layers= args.num_layers).to(self.device)
         decoder = Decoder(OUTPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, DEC_DROPOUT, attn).to(self.device)
         
         self.encoder = encoder
@@ -307,12 +307,12 @@ class Seq2SeqModel(BaseModel):
         #return outputs
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):
+    def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout, num_layers):
         super().__init__()
         
         self.embedding = nn.Embedding(input_dim, emb_dim)
         
-        self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional = True)
+        self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional = True,num_layers = num_layers)
         
         self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)
         
