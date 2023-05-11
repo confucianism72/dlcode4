@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from dataset import LMDataset, Seq2SeqDataset
 from evaluation import evaluate
-
+import torch.multiprocessing as mp
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -102,6 +102,7 @@ def train(args):
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn')
     args = get_args()
     print(args)
     train(args)
