@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument("--teacher-forcing-ratio", default=0.5, type=float)
     parser.add_argument("--dropout-input", default=0.5, type=float)
     parser.add_argument("--dropout-output", default=0.5, type=float)
+    parser.add_argument("--clip", default = 1, type=float)
     parser.add_argument("--num-epoch", default=20, type=int)
     parser.add_argument("--save-interval", default=1, type=int)
     parser.add_argument("--save-dir", default="models")
@@ -78,6 +79,7 @@ def train(args):
                 optimizer.zero_grad()
                 loss = model.get_loss(**samples,eval = 0)
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
                 optimizer.step()
                 losses.append(loss.item())
                 pbar.set_description("Epoch: %d, Loss: %0.8f, lr: %0.6f" %
