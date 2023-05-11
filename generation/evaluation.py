@@ -10,6 +10,8 @@ from transformer import *
 
 @torch.no_grad()
 def evaluate(model, dataset):
+    device = torch.device('mps') if torch.backends.mps.is_available()  else  (torch.device(
+                                    "cuda") if torch.cuda.is_available() else torch.device("cpu"))
     model.eval()
     batch_size = 128
     dataloader = DataLoader(dataset,
@@ -21,9 +23,10 @@ def evaluate(model, dataset):
         bsz = len(samples['lengths'])
         logits = model.logits(**samples)
         lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1))
-        print(lprobs.shape)
-        print(logits.shape)
-        entropy = F.nll_loss(lprobs,
+        # print(next(model.parameters()).device)
+        # print(lprobs.device)
+        # print(logits.device)
+        entropy = F.nll_loss(lprobs.to(device),
                              samples["target"].view(-1),
                              ignore_index=dataset.padding_idx,
                              reduction="none").view(bsz, -1)

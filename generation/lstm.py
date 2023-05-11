@@ -101,13 +101,16 @@ class Seq2SeqModel(BaseModel):
         #                  TODO: You need to complete the code here                  #
         ##############################################################################
         #ENC_HID_DIM = args.hidden_size
+        self.device = torch.device('mps') if torch.backends.mps.is_available()  else  (torch.device(
+                                    "cuda") if torch.cuda.is_available() else torch.device("cpu"))
+
         attn = Attention(args.hidden_size, args.hidden_size)
         INPUT_DIM = len(dictionary)
         OUTPUT_DIM = len(dictionary)
         ENC_DROPOUT = args.dropout_input
         DEC_DROPOUT = args.dropout_output
-        encoder = Encoder(INPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, ENC_DROPOUT)
-        decoder = Decoder(OUTPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, DEC_DROPOUT, attn)
+        encoder = Encoder(INPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, ENC_DROPOUT).to(self.device)
+        decoder = Decoder(OUTPUT_DIM, args.embedding_dim , args.hidden_size, args.hidden_size, DEC_DROPOUT, attn).to(self.device)
         
         self.encoder = encoder
         self.decoder = decoder
@@ -144,7 +147,7 @@ class Seq2SeqModel(BaseModel):
         trg_vocab_size = self.decoder.output_dim
         
         #tensor to store decoder outputs
-        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size)#.to(self.device)
+        outputs = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
         
         #encoder_outputs is all hidden states of the input sequence, back and forwards
         #hidden is the final forward and backward hidden states, passed through a linear layer
@@ -176,7 +179,7 @@ class Seq2SeqModel(BaseModel):
             #if teacher forcing, use actual next token as next input
             #if not, use predicted token
             input = trg[t] if teacher_force else top1
-            
+        # print('forward',outputs.shape,outputs.device)
         return outputs
 
     def logits(self, source, prev_outputs,lengths,eval = 1, **unused):
@@ -218,11 +221,14 @@ class Seq2SeqModel(BaseModel):
         ##############################################################################
         #                              END OF YOUR CODE                              #
         ##############################################################################
+        # print('logits',logits.shape,logits.device)
         return logits
 
-    def get_loss(self, source, prev_outputs, target,  reduce=True,  **unused):
-        logits = self.logits( source, prev_outputs, target, **unused)
-        lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1))
+    def get_loss(self, source, prev_outputs, target, lengths, eval, reduce=True,  **unused):
+        logits = self.logits( source, prev_outputs, lengths,eval = eval , **unused).permute(1,0,2) # ource, prev_outputs,lengths,
+        lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1)) 
+        # print(logits.shape, lprobs.shape, target.shape)
+        # print(logits.device, lprobs.device, target.device)#, self.padding_idx.device)
         return F.nll_loss(
             lprobs,
             target.view(-1),
@@ -257,27 +263,37 @@ class Seq2SeqModel(BaseModel):
 
         mask = self.create_mask(src_tensor)
             
-        trg_indexes = [self.dictionary.bos()]
+        trg_indexes = [[self.dictionary.bos(),1]]
 
-        attentions = torch.zeros(max_len, 1, len(in_token))
+        # attentions = torch.zeros(max_len, 1, len(in_token))
         
         end = self.dictionary.eos()
+
+        if beam_size is None:
+            beam_size = 1
+
         for i in range(max_len):
+            new = []
+            t_list = []
+            for trg_tokens in trg_indexes:
+                trg_tensor = torch.LongTensor([trg_tokens[0][-1]])                   
+                with torch.no_grad():
+                    output, hidden, attention = self.decoder(trg_tensor, hidden, encoder_outputs, mask)
+                # attentions[i] = attention
+                # output = [batch size, output dim]
 
-            trg_tensor = torch.LongTensor([trg_indexes[-1]])
-                    
-            with torch.no_grad():
-                output, hidden, attention = self.decoder(trg_tensor, hidden, encoder_outputs, mask)
+                output = F.log_softmax(output, dim=1)
+                prob , topk = output.topk(beam_size, dim=1)
+                # pred_token = output.argmax(1).item()
+                new1 = [[trg_tokens[0] + [t], trg_tokens[1] + prob[t] if t != end else  trg_tokens[1] ] for t in topk]
+                # trg_tokens.append(pred_token)
+                new.extend(new1)
+                t_list.extend(topk)
+            new.sort(key=lambda x: x[1], reverse=True)
+            trg_indexes = new[0:beam_size]
 
-            attentions[i] = attention
-                
-            pred_token = output.argmax(1).item()
-            
-            trg_indexes.append(pred_token)
-
-            if pred_token == end: #trg_field.vocab.stoi[trg_field.eos_token]:
+            if all(t == end for t in t_list): #trg_field.vocab.stoi[trg_field.eos_token]:
                 break
-        
         #trg_tokens = [trg_field.vocab.itos[i] for i in trg_indexes]
         
         outputs = self.dictionary.decode_line(trg_indexes[1:])
