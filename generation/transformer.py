@@ -177,11 +177,11 @@ class Seq2SeqModel(nn.Module):
     
 
     def get_loss(self, source, prev_outputs, target, reduce=True, **unused):
-        logits = self.logits(source, prev_outputs)
+        logits = self.logits(source, prev_outputs[:, :-1])
         lprobs = F.log_softmax(logits.contiguous(), dim=-1).view(-1, logits.size(-1))
         return F.nll_loss(
             lprobs,
-            prev_outputs.view(-1),
+            prev_outputs[:, 1:].contiguous().view(-1),
             #target.view(-1),
             ignore_index=self.padding_idx,# self.dictionary.eos()],
             reduction="sum" if reduce else "none",
