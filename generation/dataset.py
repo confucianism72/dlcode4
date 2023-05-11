@@ -234,12 +234,14 @@ class Seq2SeqDataset(Dataset):
             prev_outputs[idx, 1:sample["length"]] = target_ids[:-1]
             target[idx, 0:sample["length"]] = target_ids
 
+        # print(type(ids), type(lens), type(source), type(prev_outputs), type(target))
+        sorted_indices = torch.sort(torch.tensor(lens), descending=True).indices
         return {
-            "ids": torch.LongTensor(ids).to(self.device),
-            "lengths": torch.LongTensor(lens).to(self.device),
-            "source": source.to(self.device),
-            "prev_outputs": prev_outputs.to(self.device),
-            "target": target.to(self.device)
+            "ids": torch.LongTensor(ids)[sorted_indices].to(self.device),
+            "lengths": torch.LongTensor(lens)[sorted_indices].to(self.device),
+            "source": source[sorted_indices].to(self.device),
+            "prev_outputs": prev_outputs[sorted_indices].to(self.device),
+            "target": target[sorted_indices].to(self.device)
         }
 
 

@@ -328,7 +328,7 @@ class Encoder(nn.Module):
         #embedded = [src len, batch size, emb dim]
                 
         #need to explicitly put lengths on cpu!
-        packed_embedded = nn.utils.rnn.pack_padded_sequence(embedded, src_len.to('cpu'), enforce_sorted=False) #####
+        packed_embedded = nn.utils.rnn.pack_padded_sequence(embedded, src_len.to('cpu')) #####
                 
         packed_outputs, hidden = self.rnn(packed_embedded)
                                  
