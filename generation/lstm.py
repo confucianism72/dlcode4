@@ -222,7 +222,7 @@ class Seq2SeqModel(BaseModel):
         #                              END OF YOUR CODE                              #
         ##############################################################################
         # print('logits',logits.shape,logits.device)
-        return logits.permute(1,0,2)[1:]
+        return logits.permute(1,0,2)[:,1:]
 
     def get_loss(self, source, prev_outputs, target, lengths, eval, reduce=True,  **unused):
         # print('get_loss',source.shape, prev_outputs.shape, target.shape, lengths.shape)
