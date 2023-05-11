@@ -90,8 +90,8 @@ def train(args):
                 optimizer.step()
                 losses.append(loss.item())
                 pbar.set_description("Epoch: %d, Loss: %0.8f, lr: %0.6f" %
-                                     (epoch + 1, loss.item()/args.batch_size *128,
-                                       #np.mean(losses)/args.batch_size*128,
+                                     (epoch + 1, #loss.item()/args.batch_size *128,
+                                       np.mean(losses)/args.batch_size*128,
                                       optimizer.param_groups[0]['lr']))
 
         if epoch % args.save_interval == 0:
