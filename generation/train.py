@@ -64,7 +64,10 @@ def train(args):
     train_loader = DataLoader(train_set,
                               batch_size=args.batch_size,
                               collate_fn=train_set.collate_fn,
-                              shuffle=True)
+                              shuffle=True,
+                              num_workers= 0 if torch.backends.mps.is_available() else 2,
+                              device = device)
+    #number of workers should be 2 if using mps
 
     evaluate(model, valid_set)
     for epoch in range(args.num_epoch):
