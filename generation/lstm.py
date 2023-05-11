@@ -293,11 +293,12 @@ class Seq2SeqModel(BaseModel):
             new.sort(key=lambda x: x[1], reverse=True)
             trg_indexes = new[0:beam_size]
 
-            if all(t == end for t in t_list): #trg_field.vocab.stoi[trg_field.eos_token]:
+            if all((t == end or t == self.padding_idx) for t in t_list): #trg_field.vocab.stoi[trg_field.eos_token]:
                 break
         #trg_tokens = [trg_field.vocab.itos[i] for i in trg_indexes]
+        final = trg_indexes.sort(key=lambda x: x[1], reverse=True)[0]
         
-        outputs = self.dictionary.decode_line(trg_indexes[1:])
+        outputs = self.dictionary.decode_line(final[1:final.index(self.dictionary.eos()) + 1])
         return outputs #trg_tokens[1:]  #, attentions[:len(trg_tokens)-1]
         
         ##############################################################################

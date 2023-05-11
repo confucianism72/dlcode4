@@ -20,6 +20,7 @@ def evaluate(model, dataset):
     ppls = []
     losses = []
     for samples in dataloader:
+        # samples['id']
         bsz = len(samples['lengths'])
         logits = model.logits(**samples)
         lprobs = F.log_softmax(logits, dim=-1).view(-1, logits.size(-1))

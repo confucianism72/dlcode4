@@ -187,6 +187,8 @@ class Seq2SeqDataset(Dataset):
 
         source_id = self.dictionary.encode_line(src_line)
         target_id = self.dictionary.encode_line(tgt_line)
+        # assert source_id[-1] == self.dictionary.eos()
+        # assert source_id[0] == self.dictionary.bos()
         assert len(source_id) == len(target_id)
         return {
             "id": index,
@@ -214,7 +216,7 @@ class Seq2SeqDataset(Dataset):
                 - "target" (torch.LongTensor): A tensor of target sequences, shape (batch_size, max_length).
                     It is padded with the padding index and contains the actual target content tokens.
         """
-        lens = [sample["length"] for sample in samples]
+        lens = [sample["length"] + 1 for sample in samples]
         max_len = max(lens)
         bsz = len(lens)
         source = torch.LongTensor(bsz, max_len)
@@ -226,12 +228,12 @@ class Seq2SeqDataset(Dataset):
 
         ids = []
         for idx, sample in enumerate(samples):
-            ids.append(sample["id"])
+            ids.append(sample["id"]) 
             source_ids = sample["source"]
             target_ids = sample["target"]
 
-            source[idx, 1:sample["length"]] = source_ids[:-1]
-            prev_outputs[idx, 1:sample["length"]] = target_ids[:-1]
+            source[idx, 1:sample["length"]+ 1] = source_ids #[:-1]
+            prev_outputs[idx, 1:sample["length"]+ 1] = target_ids#[:-1]
             target[idx, 0:sample["length"]] = target_ids
 
         # print(type(ids), type(lens), type(source), type(prev_outputs), type(target))

@@ -26,6 +26,10 @@ def get_args():
     parser.add_argument("--teacher-forcing-ratio", default=0.5, type=float)
     parser.add_argument("--dropout-input", default=0.5, type=float)
     parser.add_argument("--dropout-output", default=0.5, type=float)
+    parser.add_argument("--enc-heads", default=8, type=int )
+    parser.add_argument("--dec-heads", default=8, type=int )
+    parser.add_argument("--enc-pf-dim", default=512, type=int )
+    parser.add_argument("--dec-pf-dim", default=512, type=int )
     parser.add_argument("--clip", default = 1, type=float)
     parser.add_argument("--num-epoch", default=20, type=int)
     parser.add_argument("--save-interval", default=1, type=int)
@@ -34,6 +38,9 @@ def get_args():
     parser.add_argument("--model-type",
                         default="transformer",
                         choices=["lstm", "transformer"])
+    parser.add_argument("--device",
+                        default=torch.device('mps') if torch.backends.mps.is_available()  else  (torch.device(
+                                    "cuda") if torch.cuda.is_available() else torch.device("cpu")),)
     args = parser.parse_args()
     return args
 
