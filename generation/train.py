@@ -73,7 +73,7 @@ def train(args):
                               batch_size=args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
-                               num_workers=2
+                            #    num_workers=2
                               )
     #number of workers should be 2 if using mps
 
@@ -102,7 +102,7 @@ def train(args):
 
 
 if __name__ == "__main__":
-    mp.set_start_method('spawn')
+    # mp.set_start_method('spawn')
     args = get_args()
     print(args)
     train(args)
